@@ -1,46 +1,36 @@
-const axios = require("axios");
-const csv = require("csv-parser");
-const fs = require("fs");
-const { MeiliSearch } = require("meilisearch");
+const MEILI_HOST = process.env.MEILI_HOST;
+const MEILI_KEY = process.env.MEILI_KEY;
+const CSV_URL = process.env.CSV_URL;
 
-const client = new MeiliSearch({
-    host: process.env.MEILI_HOST,
-    apiKey: process.env.MEILI_KEY
-});
+async function runImport() {
+  try {
+    console.log("Downloading CSV...");
 
-const index = client.index("data");
+    const response = await fetch(CSV_URL);
+    const data = await response.text();
 
-async function downloadCSV() {
-    const writer = fs.createWriteStream("data.csv");
+    console.log("CSV downloaded");
 
-    const response = await axios({
-        url: process.env.CSV_URL,
-        method: "GET",
-        responseType: "stream"
+    const documents = data.split("\n").map((line, index) => ({
+      id: index,
+      content: line
+    }));
+
+    console.log("Sending to Meilisearch...");
+
+    await fetch(`${MEILI_HOST}/indexes/numbers/documents`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${MEILI_KEY}`
+      },
+      body: JSON.stringify(documents)
     });
 
-    response.data.pipe(writer);
-
-    return new Promise((resolve) => {
-        writer.on("finish", resolve);
-    });
+    console.log("Import completed ✅");
+  } catch (err) {
+    console.error("Import error:", err);
+  }
 }
 
-async function run() {
-    await downloadCSV();
-
-    const records = [];
-
-    fs.createReadStream("data.csv")
-        .pipe(csv())
-        .on("data", (row) => {
-            const text = Object.values(row).join(" ");
-            records.push({ id: records.length + 1, text });
-        })
-        .on("end", async () => {
-            await index.addDocuments(records);
-            console.log("✅ Data uploaded to Meilisearch");
-        });
-}
-
-run();
+runImport();

@@ -6,23 +6,33 @@ async function runImport() {
   console.log("Starting import...");
 
   const response = await fetch(CSV_URL);
-  const data = await response.text();
+  const text = await response.text();
 
-  const documents = data.split("\n").map((line, index) => ({
-    id: index,
-    content: line
-  }));
+  const lines = text.split("\n");
 
-  await fetch(`${MEILI_HOST}/indexes/numbers/documents`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${MEILI_KEY}`
-    },
-    body: JSON.stringify(documents)
-  });
+  const BATCH_SIZE = 100; // small chunks
 
-  console.log("Import done ✅");
+  for (let i = 0; i < lines.length; i += BATCH_SIZE) {
+    const batch = lines.slice(i, i + BATCH_SIZE);
+
+    const documents = batch.map((line, index) => ({
+      id: i + index,
+      content: line
+    }));
+
+    await fetch(`${MEILI_HOST}/indexes/numbers/documents`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${MEILI_KEY}`
+      },
+      body: JSON.stringify(documents)
+    });
+
+    console.log(`Imported batch ${i} - ${i + BATCH_SIZE}`);
+  }
+
+  console.log("Import completed ✅");
 }
 
 module.exports = runImport;

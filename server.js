@@ -1,9 +1,10 @@
 const express = require("express");
 const { MeiliSearch } = require("meilisearch");
+const { exec } = require("child_process");
 
 const app = express();
 
-// Environment variables (Render pe set karna)
+// Environment variables
 const client = new MeiliSearch({
     host: process.env.MEILI_HOST,
     apiKey: process.env.MEILI_KEY
@@ -37,6 +38,16 @@ app.get("/data", async (req, res) => {
     } catch (err) {
         res.json({ error: err.message });
     }
+});
+
+// 🔥 Import trigger route (no shell needed)
+app.get("/import", (req, res) => {
+    exec("node import.js", (err, stdout, stderr) => {
+        if (err) {
+            return res.status(500).send(err.message);
+        }
+        res.send("✅ Import started...\n\n" + stdout);
+    });
 });
 
 // Start server
